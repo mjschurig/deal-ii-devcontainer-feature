@@ -1,6 +1,6 @@
 {
   "id": "deal-ii",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "deal.II",
   "description": "Installs deal.II (Differential Equations Analysis Library) - a C++ finite element library",
   "documentationURL": "https://github.com/deal-ii/dealii",

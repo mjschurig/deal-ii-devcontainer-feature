@@ -101,7 +101,10 @@ apt-get install -y --no-install-recommends \
     liblapack-dev \
     zlib1g-dev \
     git \
-    curl
+    curl \
+    libhdf5-dev \
+    libsuitesparse-dev \
+    gfortran
 
 # Install optional MPI support
 if [ "${ENABLE_MPI}" = "true" ]; then
@@ -109,7 +112,9 @@ if [ "${ENABLE_MPI}" = "true" ]; then
     apt-get install -y --no-install-recommends \
         libopenmpi-dev \
         openmpi-bin \
-        openmpi-common
+        openmpi-common \
+        libhdf5-mpi-dev \
+        libscalapack-mpi-dev
 fi
 
 # Install optional PETSc support
@@ -284,8 +289,16 @@ fi
 cmake .. ${CMAKE_ARGS} \
     -DDEAL_II_COMPONENT_DOCUMENTATION=OFF \
     -DDEAL_II_COMPONENT_EXAMPLES=OFF \
-    -DCMAKE_BUILD_TYPE=Release || {
+    -DCMAKE_BUILD_TYPE=Release 2>&1 | tee cmake_output.log || {
         print_error "CMake configuration failed."
+        print_error "Last 50 lines of CMake output:"
+        tail -n 50 cmake_output.log
+        
+        if [ -f "CMakeFiles/CMakeError.log" ]; then
+            print_error "CMake Error Log (last 100 lines):"
+            tail -n 100 CMakeFiles/CMakeError.log
+        fi
+        
         cd /
         rm -rf ${BUILD_DIR}
         exit 1
