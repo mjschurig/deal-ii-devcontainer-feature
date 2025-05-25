@@ -12,7 +12,7 @@ Add this feature to your `.devcontainer/devcontainer.json`:
 {
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "features": {
-    "ghcr.io/[your-username]/deal-ii-devcontainer-feature/deal-ii:1": {
+    "ghcr.io/mjschurig/deal-ii-devcontainer-feature/deal-ii:1": {
       "version": "9.5.0"
     }
   }
@@ -48,7 +48,7 @@ To keep it lean, these are **NOT** included:
 ```json
 {
   "features": {
-    "ghcr.io/[your-username]/deal-ii-devcontainer-feature/deal-ii:1": {
+    "ghcr.io/mjschurig/deal-ii-devcontainer-feature/deal-ii:1": {
       "version": "9.5.0",
       "enableMPI": true,
       "buildThreads": "8"
@@ -62,7 +62,7 @@ To keep it lean, these are **NOT** included:
 ```json
 {
   "features": {
-    "ghcr.io/[your-username]/deal-ii-devcontainer-feature/deal-ii:1": {
+    "ghcr.io/mjschurig/deal-ii-devcontainer-feature/deal-ii:1": {
       "version": "9.5.0",
       "enablePETSc": true,
       "enableMPI": true
