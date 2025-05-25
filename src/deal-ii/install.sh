@@ -94,6 +94,21 @@ echo 'tzdata tzdata/Zones/Etc select UTC' | debconf-set-selections
 
 # Install base dependencies
 apt-get update
+
+# Remove any existing system Trilinos packages to prevent conflicts
+print_info "Removing any existing system Trilinos packages to prevent conflicts..."
+apt-get remove -y --purge \
+    trilinos-all-dev \
+    libtrilinos-ml-dev \
+    libtrilinos-aztecoo-dev \
+    libtrilinos-epetra-dev \
+    libtrilinos-ifpack-dev \
+    libtrilinos-amesos-dev \
+    libtrilinos-teuchos-dev \
+    libtrilinos-zoltan-dev \
+    libtrilinos-dev \
+    trilinos-dev 2>/dev/null || true
+
 apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -118,6 +133,29 @@ if [ "${ENABLE_MPI}" = "true" ]; then
         openmpi-common \
         libhdf5-mpi-dev \
         libscalapack-mpi-dev
+    
+    # Remove any conflicting system Trilinos packages that might have been installed as dependencies
+    print_info "Removing any conflicting system Trilinos packages..."
+    apt-get remove -y --purge \
+        trilinos-all-dev \
+        libtrilinos-ml-dev \
+        libtrilinos-aztecoo-dev \
+        libtrilinos-epetra-dev \
+        libtrilinos-ifpack-dev \
+        libtrilinos-amesos-dev \
+        libtrilinos-teuchos-dev \
+        libtrilinos-zoltan-dev \
+        libtrilinos-dev \
+        trilinos-dev 2>/dev/null || true
+    
+    # Clean up any leftover config files
+    rm -rf /usr/lib/x86_64-linux-gnu/cmake/Trilinos* \
+           /usr/lib/x86_64-linux-gnu/cmake/ML* \
+           /usr/lib/x86_64-linux-gnu/cmake/Epetra* \
+           /usr/lib/x86_64-linux-gnu/cmake/Teuchos* \
+           /usr/lib/x86_64-linux-gnu/cmake/AztecOO* \
+           /usr/lib/x86_64-linux-gnu/cmake/Ifpack* \
+           /usr/lib/x86_64-linux-gnu/cmake/Amesos* 2>/dev/null || true
 fi
 
 # Install optional PETSc support
@@ -302,8 +340,13 @@ mkdir -p build && cd build
 if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
     export CMAKE_PREFIX_PATH="/usr/local/trilinos:${CMAKE_PREFIX_PATH}"
     export LD_LIBRARY_PATH="/usr/local/trilinos/lib:${LD_LIBRARY_PATH}"
+    export Trilinos_ROOT="/usr/local/trilinos"
+    export Trilinos_DIR="/usr/local/trilinos"
+    export PKG_CONFIG_PATH="/usr/local/trilinos/lib/pkgconfig:${PKG_CONFIG_PATH}"
     print_info "Set CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
     print_info "Set LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+    print_info "Set Trilinos_ROOT=${Trilinos_ROOT}"
+    print_info "Set Trilinos_DIR=${Trilinos_DIR}"
 fi
 
 CMAKE_ARGS="-DCMAKE_INSTALL_PREFIX=/usr/local/deal.II"
@@ -316,6 +359,9 @@ fi
 if [ "${ENABLE_TRILINOS}" = "true" ]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_TRILINOS=ON"
     CMAKE_ARGS="${CMAKE_ARGS} -DTRILINOS_DIR=/usr/local/trilinos"
+    # Force CMake to use our custom Trilinos installation
+    CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=/usr/local/trilinos:\${CMAKE_PREFIX_PATH}"
+    CMAKE_ARGS="${CMAKE_ARGS} -DTrilinos_ROOT=/usr/local/trilinos"
 fi
 
 # Configure with minimal features for a lean installation
