@@ -1,0 +1,30 @@
+{
+    "mpi-enabled": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+        "features": {
+            "deal-ii": {
+                "version": "9.5.0",
+                "enableMPI": true
+            }
+        }
+    },
+    "idempotency": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian-12",
+        "features": {
+            "deal-ii": {
+                "version": "9.5.0"
+            }
+        }
+    },
+    "trilinos-enabled": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+        "features": {
+            "deal-ii": {
+                "version": "9.5.0",
+                "enableMPI": true,
+                "enableTrilinos": true,
+                "buildThreads": "2"
+            }
+        }
+    }
+} 
