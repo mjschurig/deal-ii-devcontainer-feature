@@ -1,3 +1,5 @@
+> **🤖 AI Disclaimer**: This project was developed entirely using AI assistance with Claude 4 Opus and Sonnet.
+
 # deal.II DevContainer Feature
 
 A lean [devcontainer feature](https://code.visualstudio.com/blogs/2022/09/15/dev-container-features) that installs [deal.II](https://www.dealii.org/) - a powerful C++ finite element library for solving partial differential equations.
