@@ -26,11 +26,12 @@ This **lean** installation includes:
 - ✅ Essential dependencies (CMake, Boost, BLAS, LAPACK)
 - ✅ Optional MPI support (when enabled)
 - ✅ Optional PETSc support (when enabled)
+- ✅ Optional Trilinos support (when enabled)
 
 To keep it lean, these are **NOT** included:
 - ❌ Documentation (saves ~100MB)
 - ❌ Examples (saves ~50MB)
-- ❌ Additional optional dependencies (Trilinos, SLEPc, etc.)
+- ❌ Additional optional dependencies (SLEPc, etc.)
 
 ## ⚙️ Options
 
@@ -39,6 +40,7 @@ To keep it lean, these are **NOT** included:
 | `version` | string | `"9.5.0"` | deal.II version to install |
 | `enableMPI` | boolean | `false` | Enable MPI support (OpenMPI) |
 | `enablePETSc` | boolean | `false` | Enable PETSc support |
+| `enableTrilinos` | boolean | `false` | Enable Trilinos support (requires MPI) |
 | `buildThreads` | string | `"4"` | Number of parallel build threads |
 
 ## 🔧 Advanced Usage
@@ -70,6 +72,23 @@ To keep it lean, these are **NOT** included:
   }
 }
 ```
+
+### With Trilinos Support
+
+```json
+{
+  "features": {
+    "ghcr.io/mjschurig/deal-ii-devcontainer-feature/deal-ii:1": {
+      "version": "9.5.0",
+      "enableTrilinos": true,
+      "enableMPI": true,
+      "buildThreads": "8"
+    }
+  }
+}
+```
+
+**Note**: Trilinos support requires MPI and significantly increases build time (30-60 minutes).
 
 ## 💻 Example Code
 

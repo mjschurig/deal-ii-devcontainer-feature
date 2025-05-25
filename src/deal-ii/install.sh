@@ -12,6 +12,7 @@ export TZ=Etc/UTC
 DEALII_VERSION="${VERSION:-9.5.0}"
 ENABLE_MPI="${ENABLEMPI:-false}"
 ENABLE_PETSC="${ENABLEPETSC:-false}"
+ENABLE_TRILINOS="${ENABLETRILINOS:-false}"
 BUILD_THREADS="${BUILDTHREADS:-4}"
 
 # Logging functions
@@ -123,6 +124,91 @@ if [ "${ENABLE_PETSC}" = "true" ]; then
         }
 fi
 
+# Install optional Trilinos support
+if [ "${ENABLE_TRILINOS}" = "true" ]; then
+    if [ "${ENABLE_MPI}" != "true" ]; then
+        print_error "Trilinos requires MPI support. Enabling MPI..."
+        ENABLE_MPI="true"
+        apt-get install -y --no-install-recommends \
+            libopenmpi-dev \
+            openmpi-bin \
+            openmpi-common
+    fi
+    
+    print_info "Building and installing Trilinos (this may take a while)..."
+    
+    # Create temporary directory for Trilinos build
+    TRILINOS_BUILD_DIR="/tmp/trilinos-build-$$"
+    mkdir -p ${TRILINOS_BUILD_DIR}
+    cd ${TRILINOS_BUILD_DIR}
+    
+    # Download Trilinos (version 13.4.1 is known to work with deal.II)
+    TRILINOS_VERSION="13.4.1"
+    print_info "Downloading Trilinos ${TRILINOS_VERSION}..."
+    
+    if ! wget -q "https://github.com/trilinos/Trilinos/archive/trilinos-release-${TRILINOS_VERSION//./-}.tar.gz" -O trilinos.tar.gz; then
+        print_error "Failed to download Trilinos. Continuing without Trilinos support..."
+        ENABLE_TRILINOS="false"
+    else
+        tar -xzf trilinos.tar.gz
+        cd Trilinos-trilinos-release-${TRILINOS_VERSION//./-}
+        
+        mkdir build && cd build
+        
+        # Configure Trilinos with packages required by deal.II
+        cmake .. \
+            -DCMAKE_INSTALL_PREFIX=/usr/local/trilinos \
+            -DCMAKE_BUILD_TYPE=RELEASE \
+            -DBUILD_SHARED_LIBS=ON \
+            -DTrilinos_ENABLE_Amesos=ON \
+            -DTrilinos_ENABLE_Epetra=ON \
+            -DTrilinos_ENABLE_EpetraExt=ON \
+            -DTrilinos_ENABLE_Ifpack=ON \
+            -DTrilinos_ENABLE_AztecOO=ON \
+            -DTrilinos_ENABLE_Sacado=ON \
+            -DTrilinos_ENABLE_Teuchos=ON \
+            -DTrilinos_ENABLE_MueLu=ON \
+            -DTrilinos_ENABLE_ML=ON \
+            -DTrilinos_ENABLE_NOX=ON \
+            -DTrilinos_ENABLE_ROL=ON \
+            -DTrilinos_ENABLE_Tpetra=ON \
+            -DTrilinos_ENABLE_SEACAS=ON \
+            -DTrilinos_ENABLE_COMPLEX=ON \
+            -DTrilinos_ENABLE_FLOAT=ON \
+            -DTrilinos_ENABLE_Zoltan=ON \
+            -DTrilinos_VERBOSE_CONFIGURE=OFF \
+            -DTPL_ENABLE_MPI=ON \
+            -DCMAKE_VERBOSE_MAKEFILE=OFF \
+            -DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON || {
+                print_error "Trilinos configuration failed. Continuing without Trilinos support..."
+                ENABLE_TRILINOS="false"
+                cd /
+                rm -rf ${TRILINOS_BUILD_DIR}
+            }
+        
+        if [ "${ENABLE_TRILINOS}" = "true" ]; then
+            make -j${BUILD_THREADS} || {
+                print_error "Trilinos build failed. Trying with fewer threads..."
+                make -j2 || {
+                    print_error "Trilinos build failed. Continuing without Trilinos support..."
+                    ENABLE_TRILINOS="false"
+                    cd /
+                    rm -rf ${TRILINOS_BUILD_DIR}
+                }
+            }
+            
+            if [ "${ENABLE_TRILINOS}" = "true" ]; then
+                make install
+                print_info "Trilinos ${TRILINOS_VERSION} installed successfully"
+            fi
+        fi
+    fi
+    
+    # Clean up Trilinos build directory
+    cd /
+    rm -rf ${TRILINOS_BUILD_DIR}
+fi
+
 # Create temporary build directory
 BUILD_DIR="/tmp/dealii-build-$$"
 mkdir -p ${BUILD_DIR}
@@ -187,6 +273,11 @@ CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_MPI=${ENABLE_MPI}"
 
 if [ "${ENABLE_PETSC}" = "true" ]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_PETSC=ON"
+fi
+
+if [ "${ENABLE_TRILINOS}" = "true" ]; then
+    CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_TRILINOS=ON"
+    CMAKE_ARGS="${CMAKE_ARGS} -DTRILINOS_DIR=/usr/local/trilinos"
 fi
 
 # Configure with minimal features for a lean installation
