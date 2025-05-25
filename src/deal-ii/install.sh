@@ -137,7 +137,9 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
         apt-get install -y --no-install-recommends \
             libopenmpi-dev \
             openmpi-bin \
-            openmpi-common
+            openmpi-common \
+            libhdf5-mpi-dev \
+            libscalapack-mpi-dev
     fi
     
     print_info "Building and installing Trilinos (this may take a while)..."
@@ -158,9 +160,17 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
         tar -xzf trilinos.tar.gz
         cd Trilinos-trilinos-release-${TRILINOS_VERSION//./-}
         
+        # Apply LAPACK compatibility patch if needed (for LAPACK 3.6.0+)
+        print_info "Applying LAPACK compatibility patch..."
+        if [ -f "packages/epetra/src/Epetra_LAPACK_wrappers.h" ]; then
+            sed -i 's/F77_BLAS_MANGLE(dggsvd,DGGSVD)/F77_BLAS_MANGLE(dggsvd3,DGGSVD3)/g' packages/epetra/src/Epetra_LAPACK_wrappers.h
+            sed -i 's/F77_BLAS_MANGLE(sggsvd,SGGSVD)/F77_BLAS_MANGLE(sggsvd3,SGGSVD3)/g' packages/epetra/src/Epetra_LAPACK_wrappers.h
+        fi
+        
         mkdir build && cd build
         
         # Configure Trilinos with packages required by deal.II
+        print_info "Configuring Trilinos..."
         cmake .. \
             -DCMAKE_INSTALL_PREFIX=/usr/local/trilinos \
             -DCMAKE_BUILD_TYPE=RELEASE \
@@ -184,7 +194,8 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
             -DTrilinos_VERBOSE_CONFIGURE=OFF \
             -DTPL_ENABLE_MPI=ON \
             -DCMAKE_VERBOSE_MAKEFILE=OFF \
-            -DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON || {
+            -DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=ON \
+            -DTrilinos_ENABLE_FORTRAN=OFF || {
                 print_error "Trilinos configuration failed. Continuing without Trilinos support..."
                 ENABLE_TRILINOS="false"
                 cd /
@@ -192,6 +203,7 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
             }
         
         if [ "${ENABLE_TRILINOS}" = "true" ]; then
+            print_info "Building Trilinos..."
             make -j${BUILD_THREADS} || {
                 print_error "Trilinos build failed. Trying with fewer threads..."
                 make -j2 || {
@@ -203,8 +215,18 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
             }
             
             if [ "${ENABLE_TRILINOS}" = "true" ]; then
+                print_info "Installing Trilinos..."
                 make install
-                print_info "Trilinos ${TRILINOS_VERSION} installed successfully"
+                
+                # Verify Trilinos installation
+                if [ -f "/usr/local/trilinos/lib/cmake/Trilinos/TrilinosConfig.cmake" ]; then
+                    print_info "Trilinos ${TRILINOS_VERSION} installed successfully"
+                    # Update library cache
+                    ldconfig
+                else
+                    print_error "Trilinos installation verification failed"
+                    ENABLE_TRILINOS="false"
+                fi
             fi
         fi
     fi
@@ -286,23 +308,35 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
 fi
 
 # Configure with minimal features for a lean installation
+# Use set -o pipefail to capture cmake exit status through the pipe
+set -o pipefail
 cmake .. ${CMAKE_ARGS} \
     -DDEAL_II_COMPONENT_DOCUMENTATION=OFF \
     -DDEAL_II_COMPONENT_EXAMPLES=OFF \
-    -DCMAKE_BUILD_TYPE=Release 2>&1 | tee cmake_output.log || {
-        print_error "CMake configuration failed."
-        print_error "Last 50 lines of CMake output:"
-        tail -n 50 cmake_output.log
-        
-        if [ -f "CMakeFiles/CMakeError.log" ]; then
-            print_error "CMake Error Log (last 100 lines):"
-            tail -n 100 CMakeFiles/CMakeError.log
-        fi
-        
-        cd /
-        rm -rf ${BUILD_DIR}
-        exit 1
-    }
+    -DCMAKE_BUILD_TYPE=Release 2>&1 | tee cmake_output.log
+CMAKE_EXIT_CODE=${PIPESTATUS[0]}
+set +o pipefail
+
+if [ ${CMAKE_EXIT_CODE} -ne 0 ]; then
+    print_error "CMake configuration failed with exit code ${CMAKE_EXIT_CODE}"
+    print_error "Last 50 lines of CMake output:"
+    tail -n 50 cmake_output.log
+    
+    if [ -f "CMakeFiles/CMakeError.log" ]; then
+        print_error "CMake Error Log (last 100 lines):"
+        tail -n 100 CMakeFiles/CMakeError.log
+    fi
+    
+    # Also check for specific Trilinos errors
+    if [ "${ENABLE_TRILINOS}" = "true" ]; then
+        print_error "Checking for Trilinos-specific errors..."
+        grep -i "trilinos" cmake_output.log | tail -20
+    fi
+    
+    cd /
+    rm -rf ${BUILD_DIR}
+    exit 1
+fi
 
 # Build and install
 print_info "Building deal.II (this may take a while)..."
@@ -328,6 +362,12 @@ if [ "${USERNAME}" != "root" ]; then
     if ! grep -q "DEAL_II_DIR" "${USER_HOME}/.bashrc" 2>/dev/null; then
         echo "export DEAL_II_DIR=/usr/local/deal.II" >> "${USER_HOME}/.bashrc"
         echo "export PATH=\${DEAL_II_DIR}/bin:\${PATH}" >> "${USER_HOME}/.bashrc"
+        
+        # Add Trilinos paths if installed
+        if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
+            echo "export CMAKE_PREFIX_PATH=/usr/local/deal.II:/usr/local/trilinos:\${CMAKE_PREFIX_PATH}" >> "${USER_HOME}/.bashrc"
+            echo "export LD_LIBRARY_PATH=/usr/local/deal.II/lib:/usr/local/trilinos/lib:\${LD_LIBRARY_PATH}" >> "${USER_HOME}/.bashrc"
+        fi
     fi
     
     # Ensure proper ownership

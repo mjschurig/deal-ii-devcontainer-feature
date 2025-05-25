@@ -155,9 +155,30 @@ This feature follows the [official devcontainer feature authoring best practices
 ## ⚠️ Important Notes
 
 - **Build Time**: Installing deal.II from source takes 15-30 minutes depending on your hardware
+  - With Trilinos enabled, expect 45-60+ minutes total build time
 - **Disk Space**: The installation requires ~2GB during build, ~500MB after installation
+  - With Trilinos: ~4GB during build, ~1.5GB after installation
 - **Compatibility**: Designed for Debian/Ubuntu-based containers
 - **Architecture**: Supports both x86_64 and arm64
+
+## 🔧 Troubleshooting
+
+### Trilinos Installation Issues
+
+If you encounter errors with Trilinos:
+
+1. **Ensure sufficient resources**: Trilinos requires significant memory (4GB+ recommended)
+2. **Check CMake logs**: The install script now captures detailed error messages
+3. **Verify dependencies**: Run the diagnostic script included in the feature:
+   ```bash
+   /usr/local/deal.II/share/deal-ii-devcontainer-feature/test-trilinos-config.sh
+   ```
+
+### Common Issues
+
+- **CMake configuration fails**: Check the cmake_output.log for specific errors
+- **Trilinos not detected**: Ensure environment variables are set (CMAKE_PREFIX_PATH, LD_LIBRARY_PATH)
+- **Build failures**: Try reducing the number of build threads with `"buildThreads": "2"`
 
 ## 📄 License
 
