@@ -27,7 +27,71 @@ print_info() {
     echo -e "\033[0;34m[INFO] $1\033[0m"
 }
 
-# OS Detection - following best practices
+# Function to remove system Trilinos packages to prevent conflicts
+remove_system_trilinos() {
+    print_info "Removing any conflicting system Trilinos packages..."
+    apt-get remove -y --purge \
+        trilinos-all-dev \
+        libtrilinos-ml-dev \
+        libtrilinos-aztecoo-dev \
+        libtrilinos-epetra-dev \
+        libtrilinos-epetraext-dev \
+        libtrilinos-ifpack-dev \
+        libtrilinos-amesos-dev \
+        libtrilinos-teuchos-dev \
+        libtrilinos-thyra-dev \
+        libtrilinos-tpetra-dev \
+        libtrilinos-belos-dev \
+        libtrilinos-nox-dev \
+        libtrilinos-sacado-dev \
+        libtrilinos-zoltan-dev \
+        libtrilinos-dev \
+        trilinos-dev 2>/dev/null || true
+    
+    # Clean up broken cmake configuration files
+    rm -rf /usr/lib/x86_64-linux-gnu/cmake/Trilinos* \
+           /usr/lib/x86_64-linux-gnu/cmake/ML* \
+           /usr/lib/x86_64-linux-gnu/cmake/Epetra* \
+           /usr/lib/x86_64-linux-gnu/cmake/EpetraExt* \
+           /usr/lib/x86_64-linux-gnu/cmake/Teuchos* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosCore* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosComm* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosParameterList* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosParser* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosNumerics* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosRemainder* \
+           /usr/lib/x86_64-linux-gnu/cmake/TeuchosKokko* \
+           /usr/lib/x86_64-linux-gnu/cmake/AztecOO* \
+           /usr/lib/x86_64-linux-gnu/cmake/Ifpack* \
+           /usr/lib/x86_64-linux-gnu/cmake/Amesos* \
+           /usr/lib/x86_64-linux-gnu/cmake/Thyra* \
+           /usr/lib/x86_64-linux-gnu/cmake/ThyraCore* \
+           /usr/lib/x86_64-linux-gnu/cmake/ThyraEpetra* \
+           /usr/lib/x86_64-linux-gnu/cmake/ThyraEpetraAdapters* \
+           /usr/lib/x86_64-linux-gnu/cmake/ThyraEpetraExtAdapters* \
+           /usr/lib/x86_64-linux-gnu/cmake/Tpetra* \
+           /usr/lib/x86_64-linux-gnu/cmake/Triutils* \
+           /usr/lib/x86_64-linux-gnu/cmake/RTOp* \
+           /usr/lib/x86_64-linux-gnu/cmake/Kokkos* \
+           /usr/lib/x86_64-linux-gnu/cmake/Zoltan* \
+           /usr/lib/x86_64-linux-gnu/cmake/Galeri* \
+           /usr/lib/x86_64-linux-gnu/cmake/Isorropia* \
+           /usr/lib/x86_64-linux-gnu/cmake/Xpetra* \
+           /usr/lib/x86_64-linux-gnu/cmake/Belos* \
+           /usr/lib/x86_64-linux-gnu/cmake/NOX* \
+           /usr/lib/x86_64-linux-gnu/cmake/LOCA* \
+           /usr/lib/x86_64-linux-gnu/cmake/Rythmos* \
+           /usr/lib/x86_64-linux-gnu/cmake/Piro* \
+           /usr/lib/x86_64-linux-gnu/cmake/Stratimikos* \
+           /usr/lib/x86_64-linux-gnu/cmake/Sacado* \
+           /usr/lib/x86_64-linux-gnu/cmake/Stokhos* \
+           /usr/share/trilinos* \
+           /usr/share/Trilinos* 2>/dev/null || true
+           
+    apt-get autoremove -y 2>/dev/null || true
+}
+
+# OS Detection
 . /etc/os-release
 ARCHITECTURE="$(dpkg --print-architecture)"
 
@@ -71,12 +135,11 @@ if [ -d "/usr/local/deal.II" ] && [ -f "/usr/local/deal.II/lib/cmake/deal.II/dea
             exit 0
         else
             print_info "Different version installed (${INSTALLED_VERSION}). Installing version ${DEALII_VERSION}..."
-            # For now, we'll proceed with installation. In future, we could support multiple versions.
         fi
     fi
 fi
 
-# Non-root user detection - following best practices
+# Non-root user detection
 USERNAME="${_REMOTE_USER:-vscode}"
 USER_UID="${_REMOTE_USER_UID:-1000}"
 USER_GID="${_REMOTE_USER_GID:-1000}"
@@ -84,31 +147,15 @@ USER_HOME="${_REMOTE_USER_HOME:-/home/${USERNAME}}"
 
 print_info "Target user: ${USERNAME} (UID: ${USER_UID}, GID: ${USER_GID})"
 
-# Configure non-interactive package installation to prevent tzdata prompts
-export DEBIAN_FRONTEND=noninteractive
-export TZ=Etc/UTC
-
 # Pre-configure tzdata to prevent interactive prompts
 echo 'tzdata tzdata/Areas select Etc' | debconf-set-selections
 echo 'tzdata tzdata/Zones/Etc select UTC' | debconf-set-selections
 
-# Install base dependencies
+# Update package lists and remove any existing system Trilinos packages
 apt-get update
+remove_system_trilinos
 
-# Remove any existing system Trilinos packages to prevent conflicts
-print_info "Removing any existing system Trilinos packages to prevent conflicts..."
-apt-get remove -y --purge \
-    trilinos-all-dev \
-    libtrilinos-ml-dev \
-    libtrilinos-aztecoo-dev \
-    libtrilinos-epetra-dev \
-    libtrilinos-ifpack-dev \
-    libtrilinos-amesos-dev \
-    libtrilinos-teuchos-dev \
-    libtrilinos-zoltan-dev \
-    libtrilinos-dev \
-    trilinos-dev 2>/dev/null || true
-
+# Install base dependencies
 apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -134,28 +181,8 @@ if [ "${ENABLE_MPI}" = "true" ]; then
         libhdf5-mpi-dev \
         libscalapack-mpi-dev
     
-    # Remove any conflicting system Trilinos packages that might have been installed as dependencies
-    print_info "Removing any conflicting system Trilinos packages..."
-    apt-get remove -y --purge \
-        trilinos-all-dev \
-        libtrilinos-ml-dev \
-        libtrilinos-aztecoo-dev \
-        libtrilinos-epetra-dev \
-        libtrilinos-ifpack-dev \
-        libtrilinos-amesos-dev \
-        libtrilinos-teuchos-dev \
-        libtrilinos-zoltan-dev \
-        libtrilinos-dev \
-        trilinos-dev 2>/dev/null || true
-    
-    # Clean up any leftover config files
-    rm -rf /usr/lib/x86_64-linux-gnu/cmake/Trilinos* \
-           /usr/lib/x86_64-linux-gnu/cmake/ML* \
-           /usr/lib/x86_64-linux-gnu/cmake/Epetra* \
-           /usr/lib/x86_64-linux-gnu/cmake/Teuchos* \
-           /usr/lib/x86_64-linux-gnu/cmake/AztecOO* \
-           /usr/lib/x86_64-linux-gnu/cmake/Ifpack* \
-           /usr/lib/x86_64-linux-gnu/cmake/Amesos* 2>/dev/null || true
+    # Remove any Trilinos packages that might have been installed as MPI dependencies
+    remove_system_trilinos
 fi
 
 # Install optional PETSc support
@@ -262,7 +289,6 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
                 # Verify Trilinos installation
                 if [ -f "/usr/local/trilinos/lib/cmake/Trilinos/TrilinosConfig.cmake" ]; then
                     print_info "Trilinos ${TRILINOS_VERSION} installed successfully"
-                    # Update library cache
                     ldconfig
                 else
                     print_error "Trilinos installation verification failed"
@@ -277,7 +303,7 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
     rm -rf ${TRILINOS_BUILD_DIR}
 fi
 
-# Create temporary build directory
+# Create temporary build directory for deal.II
 BUILD_DIR="/tmp/dealii-build-$$"
 mkdir -p ${BUILD_DIR}
 cd ${BUILD_DIR}
@@ -319,7 +345,6 @@ download_dealii() {
 
 # Download deal.II source
 if ! download_dealii "${DEALII_VERSION}"; then
-    # Clean up and exit
     cd /
     rm -rf ${BUILD_DIR}
     exit 1
@@ -343,14 +368,22 @@ if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
     export Trilinos_ROOT="/usr/local/trilinos"
     export Trilinos_DIR="/usr/local/trilinos"
     export PKG_CONFIG_PATH="/usr/local/trilinos/lib/pkgconfig:${PKG_CONFIG_PATH}"
-    print_info "Set CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
-    print_info "Set LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
-    print_info "Set Trilinos_ROOT=${Trilinos_ROOT}"
-    print_info "Set Trilinos_DIR=${Trilinos_DIR}"
+    unset CMAKE_MODULE_PATH
+    export CMAKE_MODULE_PATH="/usr/local/trilinos/lib/cmake"
+    
+    print_info "Set Trilinos environment variables:"
+    print_info "  CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
+    print_info "  LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+    print_info "  Trilinos_ROOT=${Trilinos_ROOT}"
 fi
 
+# Build CMake arguments
 CMAKE_ARGS="-DCMAKE_INSTALL_PREFIX=/usr/local/deal.II"
 CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_MPI=${ENABLE_MPI}"
+CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release"
+CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_COMPONENT_DOCUMENTATION=OFF"
+CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_COMPONENT_EXAMPLES=OFF"
+CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_VERBOSE_MAKEFILE=ON"
 
 if [ "${ENABLE_PETSC}" = "true" ]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_PETSC=ON"
@@ -359,40 +392,29 @@ fi
 if [ "${ENABLE_TRILINOS}" = "true" ]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_TRILINOS=ON"
     CMAKE_ARGS="${CMAKE_ARGS} -DTRILINOS_DIR=/usr/local/trilinos"
-    # Force CMake to use our custom Trilinos installation
     CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=/usr/local/trilinos:\${CMAKE_PREFIX_PATH}"
     CMAKE_ARGS="${CMAKE_ARGS} -DTrilinos_ROOT=/usr/local/trilinos"
+    CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_IGNORE_PATH=/usr/lib/x86_64-linux-gnu/cmake"
+    CMAKE_ARGS="${CMAKE_ARGS} -DCMAKE_FIND_ROOT_PATH=/usr/local/trilinos"
 fi
 
-# Configure with minimal features for a lean installation
+# Run CMake configuration
 print_info "Running CMake configuration (this may take a few minutes)..."
 print_info "CMake arguments: ${CMAKE_ARGS}"
 
-# Run cmake and capture exit code
-cmake .. ${CMAKE_ARGS} \
-    -DDEAL_II_COMPONENT_DOCUMENTATION=OFF \
-    -DDEAL_II_COMPONENT_EXAMPLES=OFF \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_VERBOSE_MAKEFILE=ON
+cmake .. ${CMAKE_ARGS}
 CMAKE_EXIT_CODE=$?
 
 if [ ${CMAKE_EXIT_CODE} -ne 0 ]; then
     print_error "CMake configuration failed with exit code ${CMAKE_EXIT_CODE}"
     
-    print_error "=== Analyzing configuration failure ==="
-    
-    # Check for common issues
+    # Provide diagnostic information
     if [ "${ENABLE_TRILINOS}" = "true" ]; then
         print_error "Trilinos support was requested. Checking Trilinos installation..."
         if [ ! -d "/usr/local/trilinos" ]; then
             print_error "Trilinos directory not found at /usr/local/trilinos"
         elif [ ! -f "/usr/local/trilinos/lib/cmake/Trilinos/TrilinosConfig.cmake" ]; then
             print_error "Trilinos CMake config not found"
-        else
-            print_error "Trilinos appears to be installed but deal.II cannot find it"
-            print_error "Current environment:"
-            echo "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
-            echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
         fi
     fi
     
@@ -402,29 +424,10 @@ if [ ${CMAKE_EXIT_CODE} -ne 0 ]; then
         which mpirun || print_error "mpirun not found in PATH"
     fi
     
+    # Show CMake logs
     if [ -f "CMakeFiles/CMakeError.log" ]; then
-        print_error "=== CMake Error Log (last 200 lines) ==="
-        tail -n 200 CMakeFiles/CMakeError.log
-    fi
-    
-    if [ -f "CMakeFiles/CMakeOutput.log" ]; then
-        print_error "=== CMake Output Log (last 100 lines) ==="
-        tail -n 100 CMakeFiles/CMakeOutput.log
-    fi
-    
-    # If Trilinos is enabled, run the diagnostic script
-    if [ "${ENABLE_TRILINOS}" = "true" ] && [ -f "${SCRIPT_DIR}/test-trilinos-config.sh" ]; then
-        print_error "=== Running Trilinos diagnostic ==="
-        bash "${SCRIPT_DIR}/test-trilinos-config.sh" || true
-    fi
-    
-    # Run general debug script if available
-    if [ -f "${SCRIPT_DIR}/debug-cmake.sh" ]; then
-        print_error "=== Running general CMake diagnostic ==="
-        export DEALII_PID="$$"
-        export DEALII_VERSION="${DEALII_VERSION}"
-        export ENABLE_MPI="${ENABLE_MPI}"
-        bash "${SCRIPT_DIR}/debug-cmake.sh" || true
+        print_error "=== CMake Error Log (last 50 lines) ==="
+        tail -n 50 CMakeFiles/CMakeError.log
     fi
     
     cd /
@@ -448,35 +451,23 @@ make -j${BUILD_THREADS} || {
 
 make install
 
-# Copy diagnostic scripts to installation directory
-if [ -d "/usr/local/deal.II" ]; then
-    mkdir -p /usr/local/deal.II/share/deal-ii-devcontainer-feature
-    if [ -f "${SCRIPT_DIR}/test-trilinos-config.sh" ]; then
-        cp "${SCRIPT_DIR}/test-trilinos-config.sh" /usr/local/deal.II/share/deal-ii-devcontainer-feature/
-        chmod +x /usr/local/deal.II/share/deal-ii-devcontainer-feature/test-trilinos-config.sh
-    fi
-    if [ -f "${SCRIPT_DIR}/debug-cmake.sh" ]; then
-        cp "${SCRIPT_DIR}/debug-cmake.sh" /usr/local/deal.II/share/deal-ii-devcontainer-feature/
-        chmod +x /usr/local/deal.II/share/deal-ii-devcontainer-feature/debug-cmake.sh
-    fi
-fi
-
-# Set proper permissions for non-root user
+# Set up environment for non-root user
 if [ "${USERNAME}" != "root" ]; then
-    print_info "Setting permissions for user ${USERNAME}..."
-    # Create user's local bin directory if it doesn't exist
+    print_info "Setting up environment for user ${USERNAME}..."
     mkdir -p "${USER_HOME}/.local/bin"
     
     # Add deal.II to user's PATH via .bashrc if not already present
     if ! grep -q "DEAL_II_DIR" "${USER_HOME}/.bashrc" 2>/dev/null; then
-        echo "export DEAL_II_DIR=/usr/local/deal.II" >> "${USER_HOME}/.bashrc"
-        echo "export PATH=\${DEAL_II_DIR}/bin:\${PATH}" >> "${USER_HOME}/.bashrc"
-        
-        # Add Trilinos paths if installed
-        if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
-            echo "export CMAKE_PREFIX_PATH=/usr/local/deal.II:/usr/local/trilinos:\${CMAKE_PREFIX_PATH}" >> "${USER_HOME}/.bashrc"
-            echo "export LD_LIBRARY_PATH=/usr/local/deal.II/lib:/usr/local/trilinos/lib:\${LD_LIBRARY_PATH}" >> "${USER_HOME}/.bashrc"
-        fi
+        {
+            echo "export DEAL_II_DIR=/usr/local/deal.II"
+            echo "export PATH=\${DEAL_II_DIR}/bin:\${PATH}"
+            
+            # Add Trilinos paths if installed
+            if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
+                echo "export CMAKE_PREFIX_PATH=/usr/local/deal.II:/usr/local/trilinos:\${CMAKE_PREFIX_PATH}"
+                echo "export LD_LIBRARY_PATH=/usr/local/deal.II/lib:/usr/local/trilinos/lib:\${LD_LIBRARY_PATH}"
+            fi
+        } >> "${USER_HOME}/.bashrc"
     fi
     
     # Ensure proper ownership
