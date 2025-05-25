@@ -4,6 +4,9 @@ set -e
 # deal.II devcontainer feature installation script
 echo "Installing deal.II..."
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Set non-interactive mode for package installations
 export DEBIAN_FRONTEND=noninteractive
 export TZ=Etc/UTC
@@ -295,6 +298,14 @@ cd "dealii-${DEALII_VERSION}"
 print_info "Configuring deal.II..."
 mkdir -p build && cd build
 
+# Export environment variables for CMake to find dependencies
+if [ "${ENABLE_TRILINOS}" = "true" ] && [ -d "/usr/local/trilinos" ]; then
+    export CMAKE_PREFIX_PATH="/usr/local/trilinos:${CMAKE_PREFIX_PATH}"
+    export LD_LIBRARY_PATH="/usr/local/trilinos/lib:${LD_LIBRARY_PATH}"
+    print_info "Set CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
+    print_info "Set LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+fi
+
 CMAKE_ARGS="-DCMAKE_INSTALL_PREFIX=/usr/local/deal.II"
 CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_MPI=${ENABLE_MPI}"
 
@@ -308,35 +319,74 @@ if [ "${ENABLE_TRILINOS}" = "true" ]; then
 fi
 
 # Configure with minimal features for a lean installation
-# Use set -o pipefail to capture cmake exit status through the pipe
-set -o pipefail
+print_info "Running CMake configuration (this may take a few minutes)..."
+print_info "CMake arguments: ${CMAKE_ARGS}"
+
+# Run cmake and capture exit code
 cmake .. ${CMAKE_ARGS} \
     -DDEAL_II_COMPONENT_DOCUMENTATION=OFF \
     -DDEAL_II_COMPONENT_EXAMPLES=OFF \
-    -DCMAKE_BUILD_TYPE=Release 2>&1 | tee cmake_output.log
-CMAKE_EXIT_CODE=${PIPESTATUS[0]}
-set +o pipefail
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_VERBOSE_MAKEFILE=ON
+CMAKE_EXIT_CODE=$?
 
 if [ ${CMAKE_EXIT_CODE} -ne 0 ]; then
     print_error "CMake configuration failed with exit code ${CMAKE_EXIT_CODE}"
-    print_error "Last 50 lines of CMake output:"
-    tail -n 50 cmake_output.log
     
-    if [ -f "CMakeFiles/CMakeError.log" ]; then
-        print_error "CMake Error Log (last 100 lines):"
-        tail -n 100 CMakeFiles/CMakeError.log
+    print_error "=== Analyzing configuration failure ==="
+    
+    # Check for common issues
+    if [ "${ENABLE_TRILINOS}" = "true" ]; then
+        print_error "Trilinos support was requested. Checking Trilinos installation..."
+        if [ ! -d "/usr/local/trilinos" ]; then
+            print_error "Trilinos directory not found at /usr/local/trilinos"
+        elif [ ! -f "/usr/local/trilinos/lib/cmake/Trilinos/TrilinosConfig.cmake" ]; then
+            print_error "Trilinos CMake config not found"
+        else
+            print_error "Trilinos appears to be installed but deal.II cannot find it"
+            print_error "Current environment:"
+            echo "CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
+            echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+        fi
     fi
     
-    # Also check for specific Trilinos errors
-    if [ "${ENABLE_TRILINOS}" = "true" ]; then
-        print_error "Checking for Trilinos-specific errors..."
-        grep -i "trilinos" cmake_output.log | tail -20
+    if [ "${ENABLE_MPI}" = "true" ]; then
+        print_error "MPI support was requested. Checking MPI installation..."
+        which mpicc || print_error "mpicc not found in PATH"
+        which mpirun || print_error "mpirun not found in PATH"
+    fi
+    
+    if [ -f "CMakeFiles/CMakeError.log" ]; then
+        print_error "=== CMake Error Log (last 200 lines) ==="
+        tail -n 200 CMakeFiles/CMakeError.log
+    fi
+    
+    if [ -f "CMakeFiles/CMakeOutput.log" ]; then
+        print_error "=== CMake Output Log (last 100 lines) ==="
+        tail -n 100 CMakeFiles/CMakeOutput.log
+    fi
+    
+    # If Trilinos is enabled, run the diagnostic script
+    if [ "${ENABLE_TRILINOS}" = "true" ] && [ -f "${SCRIPT_DIR}/test-trilinos-config.sh" ]; then
+        print_error "=== Running Trilinos diagnostic ==="
+        bash "${SCRIPT_DIR}/test-trilinos-config.sh" || true
+    fi
+    
+    # Run general debug script if available
+    if [ -f "${SCRIPT_DIR}/debug-cmake.sh" ]; then
+        print_error "=== Running general CMake diagnostic ==="
+        export DEALII_PID="$$"
+        export DEALII_VERSION="${DEALII_VERSION}"
+        export ENABLE_MPI="${ENABLE_MPI}"
+        bash "${SCRIPT_DIR}/debug-cmake.sh" || true
     fi
     
     cd /
     rm -rf ${BUILD_DIR}
     exit 1
 fi
+
+print_info "CMake configuration completed successfully!"
 
 # Build and install
 print_info "Building deal.II (this may take a while)..."
@@ -351,6 +401,19 @@ make -j${BUILD_THREADS} || {
 }
 
 make install
+
+# Copy diagnostic scripts to installation directory
+if [ -d "/usr/local/deal.II" ]; then
+    mkdir -p /usr/local/deal.II/share/deal-ii-devcontainer-feature
+    if [ -f "${SCRIPT_DIR}/test-trilinos-config.sh" ]; then
+        cp "${SCRIPT_DIR}/test-trilinos-config.sh" /usr/local/deal.II/share/deal-ii-devcontainer-feature/
+        chmod +x /usr/local/deal.II/share/deal-ii-devcontainer-feature/test-trilinos-config.sh
+    fi
+    if [ -f "${SCRIPT_DIR}/debug-cmake.sh" ]; then
+        cp "${SCRIPT_DIR}/debug-cmake.sh" /usr/local/deal.II/share/deal-ii-devcontainer-feature/
+        chmod +x /usr/local/deal.II/share/deal-ii-devcontainer-feature/debug-cmake.sh
+    fi
+fi
 
 # Set proper permissions for non-root user
 if [ "${USERNAME}" != "root" ]; then
