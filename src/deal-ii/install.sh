@@ -4,6 +4,10 @@ set -e
 # deal.II devcontainer feature installation script
 echo "Installing deal.II..."
 
+# Set non-interactive mode for package installations
+export DEBIAN_FRONTEND=noninteractive
+export TZ=Etc/UTC
+
 # Feature options
 DEALII_VERSION="${VERSION:-9.5.0}"
 ENABLE_MPI="${ENABLEMPI:-false}"
@@ -75,6 +79,14 @@ USER_GID="${_REMOTE_USER_GID:-1000}"
 USER_HOME="${_REMOTE_USER_HOME:-/home/${USERNAME}}"
 
 print_info "Target user: ${USERNAME} (UID: ${USER_UID}, GID: ${USER_GID})"
+
+# Configure non-interactive package installation to prevent tzdata prompts
+export DEBIAN_FRONTEND=noninteractive
+export TZ=Etc/UTC
+
+# Pre-configure tzdata to prevent interactive prompts
+echo 'tzdata tzdata/Areas select Etc' | debconf-set-selections
+echo 'tzdata tzdata/Zones/Etc select UTC' | debconf-set-selections
 
 # Install base dependencies
 apt-get update
