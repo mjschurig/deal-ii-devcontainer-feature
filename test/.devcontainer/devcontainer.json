@@ -1,0 +1,21 @@
+{
+  "name": "deal.II Test Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "../../src/deal-ii": {
+      "version": "9.5.0",
+      "enableMPI": false,
+      "enablePETSc": false,
+      "buildThreads": "4"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "postCreateCommand": "echo 'deal.II is installed at: $DEAL_II_DIR'"
+} 

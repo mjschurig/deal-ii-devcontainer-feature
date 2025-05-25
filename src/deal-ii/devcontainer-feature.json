@@ -1,0 +1,53 @@
+{
+  "id": "deal-ii",
+  "version": "1.0.0",
+  "name": "deal.II",
+  "description": "Installs deal.II (Differential Equations Analysis Library) - a C++ finite element library",
+  "documentationURL": "https://github.com/deal-ii/dealii",
+  "licenseURL": "https://github.com/dealii/dealii/blob/master/LICENSE.md",
+  "keywords": [
+    "cpp",
+    "c++",
+    "finite-elements",
+    "fem",
+    "pde",
+    "numerical-analysis",
+    "scientific-computing"
+  ],
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "9.2.0",
+        "9.3.0",
+        "9.4.0",
+        "9.5.0",
+        "9.5.1"
+      ],
+      "default": "9.5.0",
+      "description": "Select the version of deal.II to install."
+    },
+    "enableMPI": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable MPI support (installs OpenMPI)"
+    },
+    "enablePETSc": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable PETSc support"
+    },
+    "buildThreads": {
+      "type": "string",
+      "default": "4",
+      "description": "Number of threads to use for building deal.II"
+    }
+  },
+  "containerEnv": {
+    "DEAL_II_DIR": "/usr/local/deal.II",
+    "CMAKE_PREFIX_PATH": "/usr/local/deal.II:${CMAKE_PREFIX_PATH}"
+  },
+  "capAdd": [],
+  "installsAfter": [],
+  "entrypoint": "bootstrap.sh"
+} 
