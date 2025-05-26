@@ -1,6 +1,6 @@
 {
   "id": "deal-ii",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "name": "deal.II",
   "description": "Installs deal.II (Differential Equations Analysis Library) - a C++ finite element library",
   "documentationURL": "https://github.com/deal-ii/dealii",
@@ -37,15 +37,26 @@
       "default": false,
       "description": "Enable PETSc support"
     },
+    "enableTrilinos": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable Trilinos support for linear algebra operations"
+    },
     "buildThreads": {
       "type": "string",
       "default": "4",
       "description": "Number of threads to use for building deal.II"
     }
   },
+  "dependsOn": {
+    "ghcr.io/mjschurig/trilinos-devcontainer-feature/trilinos": {
+      "when": "options.enableTrilinos == true"
+    }
+  },
   "containerEnv": {
     "DEAL_II_DIR": "/usr/local/deal.II",
-    "CMAKE_PREFIX_PATH": "/usr/local/deal.II:${CMAKE_PREFIX_PATH}"
+    "CMAKE_PREFIX_PATH": "/usr/local/deal.II:/usr/local/trilinos:${CMAKE_PREFIX_PATH}",
+    "TRILINOS_DIR": "/usr/local/trilinos"
   },
   "capAdd": [],
   "installsAfter": [],

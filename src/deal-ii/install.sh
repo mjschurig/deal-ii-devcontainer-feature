@@ -12,6 +12,7 @@ export TZ=Etc/UTC
 DEALII_VERSION="${VERSION:-9.5.0}"
 ENABLE_MPI="${ENABLEMPI:-false}"
 ENABLE_PETSC="${ENABLEPETSC:-false}"
+ENABLE_TRILINOS="${ENABLETRILINOS:-false}"
 BUILD_THREADS="${BUILDTHREADS:-4}"
 
 # Logging functions
@@ -187,6 +188,26 @@ CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_MPI=${ENABLE_MPI}"
 
 if [ "${ENABLE_PETSC}" = "true" ]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_PETSC=ON"
+fi
+
+# Trilinos configuration 
+if [ "${ENABLE_TRILINOS}" = "true" ]; then
+    print_info "Configuring deal.II with Trilinos support..."
+    # Check if Trilinos is available
+    if [ -d "/usr/local/trilinos" ]; then
+        CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_TRILINOS=ON"
+        CMAKE_ARGS="${CMAKE_ARGS} -DTrilinos_DIR=/usr/local/trilinos/lib/cmake/Trilinos"
+        # Ensure MPI is enabled when Trilinos is used (Trilinos typically requires MPI)
+        if [ "${ENABLE_MPI}" = "false" ]; then
+            print_info "Enabling MPI automatically due to Trilinos dependency..."
+            ENABLE_MPI="true"
+            CMAKE_ARGS="${CMAKE_ARGS} -DDEAL_II_WITH_MPI=ON"
+        fi
+    else
+        print_error "Trilinos support requested but Trilinos installation not found at /usr/local/trilinos"
+        print_info "Make sure the Trilinos feature is installed first"
+        exit 1
+    fi
 fi
 
 # Configure with minimal features for a lean installation
